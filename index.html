@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>PDF → DOCX (Azure Document Intelligence)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:720px;margin:40px auto;padding:0 16px}
+  .card{border:1px solid #ddd;border-radius:12px;padding:20px}
+  label{display:block;margin:12px 0 6px}
+  input[type="text"]{width:100%;padding:10px;border:1px solid #ccc;border-radius:8px}
+  button{padding:10px 16px;border:0;border-radius:8px;background:#2563eb;color:#fff;cursor:pointer}
+  button:disabled{opacity:.6;cursor:not-allowed}
+  .row{display:flex;gap:12px;align-items:center}
+  .hint{color:#666;font-size:12px;margin-top:6px}
+  .log{margin-top:16px;white-space:pre-wrap;color:#444;background:#fafafa;border:1px dashed #ddd;border-radius:8px;padding:12px}
+</style>
+</head>
+<body>
+  <h1>PDF → DOCX</h1>
+  <div class="card">
+    <label>Upload PDF</label>
+    <input id="file" type="file" accept="application/pdf" />
+
+    <label style="margin-top:16px;">Title (optional)</label>
+    <input id="title" type="text" placeholder="My DOCX" />
+
+    <div class="row" style="margin:14px 0 18px">
+      <input id="pandoc" type="checkbox" />
+      <label for="pandoc" style="margin:0">Prefer Pandoc (better math/tables)</label>
+    </div>
+
+    <button id="go">Process</button>
+    <div class="hint">API: <code>http://localhost:8000/ocr-file</code> (change if different)</div>
+    <div id="log" class="log" style="display:none"></div>
+  </div>
+
+<script>
+const API_URL = "http://localhost:8000/ocr-file"; // docker compose network? use "http://azure-ocr-api:8000/ocr-file"
+
+const $ = (id)=>document.getElementById(id);
+const log = (msg)=>{ const el=$("log"); el.style.display="block"; el.textContent = msg; };
+
+$("go").addEventListener("click", async () => {
+  const file = $("file").files[0];
+  if (!file) return alert("Choose a PDF first.");
+
+  const title = $("title").value || "My DOCX";
+  const preferPandoc = $("pandoc").checked ? "true" : "false";
+
+  const btn = $("go");
+  btn.disabled = true; log("Uploading…");
+
+  try {
+    const fd = new FormData();
+    fd.append("file", file);                 // field name MUST be "file"
+    fd.append("title", title);
+    fd.append("prefer_pandoc", preferPandoc);
+
+    const res = await fetch(API_URL, { method: "POST", body: fd });
+    if (!res.ok) {
+      const txt = await res.text();
+      throw new Error(`HTTP ${res.status}\n${txt}`);
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "output.docx";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    log("Done. Your DOCX has downloaded as output.docx.");
+  } catch (err) {
+    log("Error:\n" + (err?.stack || err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

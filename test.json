@@ -1,0 +1,52 @@
+{
+  "name": "OCR (simple, compose URL)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ocr",
+        "responseMode": "lastNode",
+        "responseData": "firstEntryBinary",
+        "responseBinaryPropertyName": "docx"
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 3,
+      "position": [-420, 0]
+    },
+    {
+      "parameters": {
+        "requestMethod": "POST",
+        "url": "http://azure-ocr-api:8000/ocr-file",
+        "sendBinaryData": true,
+        "binaryPropertyName": "file",
+        "sendFormData": true,
+        "formDataParametersUi": {
+          "parameter": [
+            {
+              "name": "title",
+              "value": "={{$json[\"query\"][\"title\"] || \"My DOCX\"}}"
+            },
+            {
+              "name": "prefer_pandoc",
+              "value": "={{$json[\"query\"][\"prefer_pandoc\"] || \"false\"}}"
+            }
+          ]
+        },
+        "responseFormat": "file",
+        "download": true,
+        "dataPropertyName": "docx",
+        "options": { "timeout": 120000 }
+      },
+      "id": "HTTPRequest",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [-120, 0]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "HTTP Request", "type": "main", "index": 0 }]] }
+  }
+}
