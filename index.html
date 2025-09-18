@@ -30,16 +30,31 @@
       <label for="pandoc" style="margin:0">Prefer Pandoc (better math/tables)</label>
     </div>
 
-    <button id="go">Process</button>
-    <div class="hint">API: <code>http://localhost:8000/ocr-file</code> (change if different)</div>
+    <label style="margin-top:4px;">API key (for testing)</label>
+    <input id="apikey" type="text" placeholder="paste the same key you saved as secret (api-key)" />
+
+    <button id="go" style="margin-top:14px;">Process</button>
+    <div class="hint">API: <code id="api-hint"></code></div>
     <div id="log" class="log" style="display:none"></div>
   </div>
 
 <script>
-const API_URL = "http://localhost:8000/ocr-file"; // docker compose network? use "http://azure-ocr-api:8000/ocr-file"
+/* ===================== CONFIG ===================== */
+/* 1) put your Azure Container App FQDN here */
+const PROD_API = "https://ocr-api.centralindia.azurecontainerapps.io/ocr-file";
+/* 2) local dev endpoint */
+const LOCAL_API = "http://localhost:8000/ocr-file";
+/* auto choose based on where the page is opened */
+const API_URL = (location.hostname === "localhost" || location.hostname === "127.0.0.1")
+  ? LOCAL_API
+  : PROD_API;
+/* ================================================== */
 
 const $ = (id)=>document.getElementById(id);
 const log = (msg)=>{ const el=$("log"); el.style.display="block"; el.textContent = msg; };
+
+/* show which API we’re targeting */
+$("api-hint").textContent = API_URL;
 
 $("go").addEventListener("click", async () => {
   const file = $("file").files[0];
@@ -47,9 +62,12 @@ $("go").addEventListener("click", async () => {
 
   const title = $("title").value || "My DOCX";
   const preferPandoc = $("pandoc").checked ? "true" : "false";
+  const API_KEY = $("apikey").value.trim(); // read from input so you don’t hardcode it
+
+  if (!API_KEY) return alert("Enter your API key (same one you saved as the 'api-key' secret).");
 
   const btn = $("go");
-  btn.disabled = true; log("Uploading…");
+  btn.disabled = true; log(`Uploading to ${API_URL}…`);
 
   try {
     const fd = new FormData();
@@ -57,10 +75,15 @@ $("go").addEventListener("click", async () => {
     fd.append("title", title);
     fd.append("prefer_pandoc", preferPandoc);
 
-    const res = await fetch(API_URL, { method: "POST", body: fd });
+    const res = await fetch(API_URL, {
+      method: "POST",
+      headers: { "x-api-key": API_KEY },     // <-- required for your FastAPI gate
+      body: fd
+    });
+
     if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`HTTP ${res.status}\n${txt}`);
+      const txt = await res.text().catch(()=> "");
+      throw new Error(`HTTP ${res.status}\n${txt || res.statusText}`);
     }
 
     const blob = await res.blob();
